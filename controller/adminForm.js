@@ -2,14 +2,14 @@ const jwt = require('jsonwebtoken');
 const userModel = require('../SchemaModel/users')
 const courseModel = require('../SchemaModel/courses');
 const { tryCatch } = require("../middleWares/trycatch");
-var cookie= require('cookie-parser');
+
 
 const loginAdmin =  async function (req,res){
     console.log("hellow we are login admin");
     const admin ={username: process.env.Admin_username,
                 password: process.env.Admin_password,}
 
-    console.log(admin)
+    console.log("adim details",admin)
     const { username,password } = req.body;
     
     
@@ -26,7 +26,16 @@ const loginAdmin =  async function (req,res){
     
   
      
-      res.cookie("adminAuth", accessToken,)
+      res.cookie("adminAuth", accessToken,);
+
+      const token = req.cookies.adminAuth;
+
+      if(!token){
+        return res.status(400).json({
+          success:false,
+          message: "cookie issue",
+        })
+      }
       console.log("Login successful");
       res.status(200).json({
         success: true,
@@ -36,6 +45,8 @@ const loginAdmin =  async function (req,res){
       });
 
 } 
+
+
 
 
 const totalData = tryCatch(async(req,res)=>{
@@ -73,6 +84,9 @@ res.status(200).json({
 });
 
 
+
+
+//
 const AdmincourseEdit = tryCatch(async (req, res) => {
     const { courseId, formData } = req.body;
   

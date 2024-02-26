@@ -33,9 +33,16 @@ const courseSchema = new mongoose.Schema({
       type: String,
       required: false,
     }, 
+    Review:[
+      {
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'Review'
+      }
+    ]
+
 },
 {
-  timestamps: true, // This option adds createdAt and updatedAt fields
+  timestamps: true, 
 });
 
 module.exports = mongoose.model('Course', courseSchema);

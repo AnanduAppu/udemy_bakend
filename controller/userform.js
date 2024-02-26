@@ -7,8 +7,8 @@ const { signAccessToken } = require("../middlewares/jwt");
 const twilio = require('twilio');
 const nodemailer = require('nodemailer');
 const config = require('../config/configure');
-
-
+const reviewModel = require('../SchemaModel/Review')
+ 
 
 
 
@@ -43,7 +43,6 @@ const PhonesendOTP = async (req, res) => {
 
 
 //user Registration
-
 
 
 const userRgistration = tryCatch(async function (req,res){
@@ -438,7 +437,7 @@ const lectureVideoCreating = tryCatch(async(req,res)=>{
   console.log("what is that");
 
   const createCourse = await courseModel.create({
-    instructor,
+    instructor:userData._id,
     title,
     description,
     videos, 
@@ -939,6 +938,77 @@ const DeleteCourseMylecture = tryCatch(async (req, res) => {
   }
 });
 
+
+// review post 
+const reviewPost = tryCatch(async(req,res)=>{
+
+  const { review, id, courseId } = req.body;
+
+  console.log(review, id, courseId)
+  const existUser = await userModel.findOne({ _id: id });
+  const checkCourse = await courseModel.findOne({ _id: courseId });
+
+  if (!existUser && !checkCourse) {
+    return res.status(400).send("User or course does not exist");
+  }
+
+  console.log("we created review in ",id)
+  const newReview = await reviewModel.create({
+    reviewer: id,
+    comment: review
+  });
+
+    const reviewId = newReview._id; 
+    
+    const updateCourse = await courseModel.updateOne(
+      { _id: courseId },
+      { $push: { Review: reviewId } }
+    );
+
+    res.status(200).json({
+      message:"review posted",
+      success:true
+    })
+})
+
+
+const showReview = tryCatch(async(req,res)=>{
+  const {id} = req.headers // reviewshow carrying course id
+
+  const findReview = await courseModel.findOne({ _id: id}).populate({
+    path: 'Review',
+    populate: {
+      path: 'reviewer',
+      model: 'userData' // Assuming your user schema is named 'userData'
+    }
+  });
+if (!findReview){
+  res.status(400).send("course not found")
+};
+
+const review = findReview.Review;
+
+console.log(review)
+
+if(review.length === 0){
+  res.status(204).json({
+    message:"no reviews",
+    success:false
+  })
+
+  return
+}
+
+res.status(200).json({
+  message:"successful",
+  review,
+  success:true
+})
+ 
+})
+
+
+
   module.exports={
     userRgistration,
     loginform,
@@ -976,7 +1046,12 @@ const DeleteCourseMylecture = tryCatch(async (req, res) => {
     courseVideoUpload,
     courseDelete,
     mylearnings,
-    DeleteCourseMylecture
+    DeleteCourseMylecture,
+
+
+
+    reviewPost,
+    showReview
 
 
 

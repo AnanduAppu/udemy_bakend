@@ -41,5 +41,10 @@ router.route("/mylearnings").get(userForm.mylearnings);// my learning section sh
 router.route("/deletecourse").delete(userForm.DeleteCourseMylecture);
 
 
+// reveiw section
+router.route("/addreview").post(userForm.reviewPost);
+router.route("/showReview").get(userForm.showReview);
+
+
 
 module.exports = router;
