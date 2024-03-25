@@ -1,4 +1,4 @@
-var cookie= require('cookie-parser');
+
 const userModel = require('../SchemaModel/users')
 const { tryCatch } = require("../middleWares/trycatch");
 const bycrypt =require("bcrypt");
@@ -8,6 +8,8 @@ const twilio = require('twilio');
 const nodemailer = require('nodemailer');
 const config = require('../config/configure');
 const reviewModel = require('../SchemaModel/Review')
+const jwt = require('jsonwebtoken')
+
  
 
 
@@ -26,12 +28,14 @@ const PhonesendOTP = async (req, res) => {
     try {
         const otp = generatedOtp();
         const userOtp = await otpModel.create({ sendto: userPhoneNumber, otp: otp });
+        const phoneOtp = jwt.sign(otp,process.env.secretKey)
         const message = await client.messages.create({
             body: `Your OTP is: ${otp}`,
             from: '+12037174991',
             to: `+${userPhoneNumber}`,
         });
 
+        res.cookie("userOtp", phoneOtp)
         console.log(`OTP sent to ${userPhoneNumber}: ${message.sid}`);
         res.status(200).json({ message: 'OTP sent successfully', userOtp });
 
@@ -49,18 +53,10 @@ const userRgistration = tryCatch(async function (req,res){
       
         console.log(req.body);
 
-        const { userData, otp:userEnteredOTP } = req.body;
+        const { userData } = req.body;
         const { name, email, phone, password } = userData;
    
-        console.log(email);
-          const userOtp = await otpModel.findOne({otp:userEnteredOTP});
-          console.log(userOtp)
-          if (!userOtp) {
-            return res.status(400).json({message:"failed to login"})
-        }
-          
-        
-
+        console.log(email);   
         const existinguser = await userModel.findOne({email:email});
         console.log(existinguser);
         if (existinguser) {
@@ -68,15 +64,12 @@ const userRgistration = tryCatch(async function (req,res){
         }
 
         try {
-            var result = await otpModel.deleteOne({ otp: userEnteredOTP });
-            
             const userSave = await userModel.create(req.body.userData);
             console.log(userSave);
-            
-
+        
             res.status(202).json({
             success:true,
-            delete:result,
+     
             userSave
            
           })
@@ -85,7 +78,6 @@ const userRgistration = tryCatch(async function (req,res){
             console.error('Error deleting OTP:', error);
             return res.status(500).json({ message: 'Internal Server Error' });
           }
-    
 });
 
 
@@ -114,6 +106,15 @@ const emailRegPasswordSetting = tryCatch(
    
     console.log(name);
     const userSave = await userModel.create(req.body);
+ 
+    const accessToken = await signAccessToken({
+      email: userSave.email,
+      name:userSave.name,
+      id: userSave._id,
+    
+    });
+    
+    res.cookie("token", accessToken,)
     console.log(userSave);
     res.status(200).json({ message: "your account created", status: true });
   },
@@ -157,6 +158,7 @@ const loginform = tryCatch( async (req,res)=>{
     console.log(accessToken);
     console.log("Login successful");
 
+    
    
     res.cookie("token", accessToken,)
     
@@ -168,6 +170,37 @@ const loginform = tryCatch( async (req,res)=>{
     });
 });
 
+//login with email (google auth)
+const emailLogin = async(req,res)=>{
+  const {Enteredemail} = req.body
+
+  try {
+    const existinguser = await userModel.findOne({email:Enteredemail});
+    if (!existinguser) {
+      return res.status(400).json({message:"user not exist",success:false})
+  }
+  const accessToken = await signAccessToken({
+    email: existinguser.email,
+    name:existinguser.name,
+    id: existinguser._id,
+    phone:existinguser.phone
+  });
+
+  res.cookie("token", accessToken)
+
+  res.status(200).json({
+    success: true,
+    message: "Successful login",
+
+
+  });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal server error", success: false });
+  }
+
+}
 
 
 
@@ -234,7 +267,7 @@ const emailVarification = async (req, res) => {
     }else{
       res.status(400).json({message:false})
     }
-   
+  
   })
 
 
@@ -262,39 +295,36 @@ const emailVarification = async (req, res) => {
   })
 
 
-  const emailLogin = tryCatch(async (req,res)=>{
-    const email = req.body
-    const existingUser = await userModel.findOne({email:email});
-    if(existingUser){
 
-      res.status(200).json({
-        message:"your logged"
-      })
-    }
-    res.status(400).json({
-      message:"your need to create an account"
-    })
-  })
 
 
 // email verification for registration
   const emailVerificationRegistration = tryCatch(async(req,res)=>{
+    
 
-    const  email  = req.body.email;
-    const verificationCode = generatedOtp();
-    const userOtp = await otpModel.create({ sendto: email, otp: verificationCode });
+    const  {email}  = req.body;
+
+    console.log(email)
+    const userOtp = generatedOtp();
+ 
+     const emailOtp = jwt.sign(userOtp,process.env.secretKey)
+  
+    console.log("the otp is ",emailOtp)
     const mailOptions = {
       from: config.email.auth.user,
       to: email,
       subject: 'Account Verification Code',
-      text: `Your verification code is: ${verificationCode}`,
+      text: `Your verification code is: ${userOtp}`,
     };
+    console.log("the otp is ww")
     transporter.sendMail(mailOptions, (error) => {
       if (error) {
         console.error(error);
+        
         return res.status(500).send('Failed to send verification code');
       }
       
+      res.cookie('userOtp',emailOtp)
       res.status(200).json({ message: 'OTP sent successfully', userOtp });
     });
   })
@@ -349,15 +379,6 @@ const userImage = tryCatch(async(req,res)=>{
     return res.status(401).json({ successful: false, error: "Unauthorized" });
   }
 
-  // Only update profileimg if imageUrl is not empty
-  // if (imageUrl) {
-  //   existingUser.profileimg = imageUrl;
-  // }
-
-  // Save the updated user data
-  // await existingUser.save();
-  // console.log("hellow")
-  // console.log(existingUser);
 
  res.status(200).json({ successful: true, message: "Image updated", Data: existingUser.profileimg });
 })
@@ -495,13 +516,13 @@ const LectureVideoShowing = tryCatch(async (req, res) => {
 
 
 // user Cart adding
-const userCartAdding = tryCatch( async(req,res)=>{
+const userCartAdding = tryCatch(async (req, res) => {
+  console.log("we are cart adding function");
+  const { courseId, userData } = req.body;
 
-  console.log("we are cart adding function")
-  const {courseId,userData} = req.body
-
-  const existUser = await userModel.findOne({ _id:userData._id })
-  console.log("user checking")
+  const existUser = await userModel.findOne({ _id: userData._id });
+  console.log(existUser);
+  console.log("user checking");
   if (!existUser) {
     return res.status(400).json({
       successful: false,
@@ -509,18 +530,14 @@ const userCartAdding = tryCatch( async(req,res)=>{
     });
   }
 
-  console.log("user checked")
-    const addCart =  await userModel.updateOne({_id:userData._id},{ $push: {cart: courseId } })
-
-
+  console.log("user checked");
+  const addCart = await userModel.updateOne({ _id: userData._id }, { $push: { cart: courseId } });
 
   res.status(200).json({
-    successful:true,
+    successful: true,
     message: "cart item added",
- 
-  })
-})
-
+  });
+});
 
 
 
@@ -590,6 +607,16 @@ const userWishListAdd= tryCatch( async(req,res)=>{
     return res.status(400).json({
       successful: false,
       message: "User not found",
+    });
+  }
+
+  const existingLectureCourse = existUser.mylecture.find((ele) => ele === courseId);
+  const existingLernigCourse = existUser.mylearnings.find((ele) => ele === courseId);
+
+  if (existingLectureCourse || existingLernigCourse) {
+    return res.status(200).json({
+      successful: true,
+      message: "Course already exists in your profile",
     });
   }
 
@@ -774,7 +801,22 @@ const courseDelete = tryCatch(async(req,res)=>{
   })
 })
 
+const videohandle = tryCatch(async(req,res)=>{
 
+const videodata = req.body
+const videofiles = videodata.videos
+console.log("the data",videofiles)
+
+const accesstoken = await signAccessToken(videofiles)
+
+res.cookie("tokenVideo", accesstoken)
+
+res.status(200).json({
+  success:true
+})
+
+
+})
 // //*order and payment 
 
 const Razorpay = require('razorpay');
@@ -841,7 +883,7 @@ const RapayCreatingId = tryCatch(async (req, res) => {
 });
 
 
-// order orderfull filled
+/// order orderfull filled
 const orderFullfill = tryCatch(async (req, res) => {
   console.log("hellow orderfull fill 1");
   const { userData } = req.body;
@@ -904,8 +946,7 @@ console.log("hellow")
       message: "No courses in my learings"
     });
   }
-
-  console.log("mylearning checked successfully");
+ 
 
   res.status(200).json({
     Data: mylearning,
@@ -1051,8 +1092,11 @@ res.status(200).json({
 
 
     reviewPost,
-    showReview
+    showReview,
 
+
+
+    videohandle
 
 
 }

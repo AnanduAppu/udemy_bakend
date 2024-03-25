@@ -7,6 +7,7 @@ const userForm = require("../controller/userform");
 
 router.route("/signup").post(userForm.userRgistration);
 router.route("/login").post(userForm.loginform);
+router.route("/email_login").post(userForm.emailLogin);
 router.route("/Phoneotpsend").post(userForm.PhonesendOTP);
 router.route("/Emailotpsend").post(userForm.emailVerificationRegistration);
 router.route("/emailvarification").post(userForm.emailVarification);
@@ -45,6 +46,8 @@ router.route("/deletecourse").delete(userForm.DeleteCourseMylecture);
 router.route("/addreview").post(userForm.reviewPost);
 router.route("/showReview").get(userForm.showReview);
 
+//stabiling video 
+router.route("/videostable").post(userForm.videohandle);
 
 
 module.exports = router;
