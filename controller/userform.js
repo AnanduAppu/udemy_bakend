@@ -1,4 +1,3 @@
-
 const userModel = require('../SchemaModel/users')
 const { tryCatch } = require("../middleWares/trycatch");
 const bycrypt =require("bcrypt");
@@ -113,7 +112,7 @@ const emailRegPasswordSetting = tryCatch(
       id: userSave._id,
     
     });
-    
+
     res.cookie("token", accessToken,)
     console.log(userSave);
     res.status(200).json({ message: "your account created", status: true });
