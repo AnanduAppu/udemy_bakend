@@ -307,11 +307,13 @@ const emailVarification = async (req, res) => {
     const userOtp = generatedOtp();
  
      const emailOtp = jwt.sign(userOtp,process.env.secretKey)
+     
   
     console.log("the otp is ",emailOtp)
     const mailOptions = {
       from: config.email.auth.user,
       to: email,
+      
       subject: 'Account Verification Code',
       text: `Your verification code is: ${userOtp}`,
     };
